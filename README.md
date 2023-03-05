@@ -1,6 +1,18 @@
 `ord`
 =====
 
+## Test
+
+### start service
+```terminal
+bitcoind -regtest
+cargo run -- --cookie-file .cookie -r server
+```
+### use api
+add header`accept:application/json`
+
+---
+
 `ord` is an index, block explorer, and command-line wallet. It is experimental
 software with no warranty. See [LICENSE](LICENSE) for more details.
 
@@ -119,18 +131,4 @@ the server and show `info`-level log messages and above:
 
 ```
 $ RUST_LOG=info cargo run server
-```
-
-New Releases
-------------
-
-Release commit messages use the following template:
-
-```
-Release x.y.z
-
-- Bump version: x.y.z → x.y.z
-- Update changelog
-- Update dependencies
-- Update database schema version
 ```

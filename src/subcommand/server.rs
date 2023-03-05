@@ -403,7 +403,8 @@ impl Server {
     Extension(page_config): Extension<Arc<PageConfig>>,
     Extension(index): Extension<Arc<Index>>,
     Path(outpoint): Path<OutPoint>,
-  ) -> ServerResult<PageHtml<OutputHtml>> {
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
     let list = if index.has_sat_index()? {
       index.list(outpoint)?
     } else {
@@ -435,16 +436,30 @@ impl Server {
 
     let inscriptions = index.get_inscriptions_on_output(outpoint)?;
 
-    Ok(
-      OutputHtml {
-        outpoint,
-        inscriptions,
-        list,
-        chain: page_config.chain,
-        output,
-      }
-      .page(page_config, index.has_sat_index()?),
-    )
+    if accept_json.0 {
+      Ok(
+        axum::Json(serde_json::json!({
+          "outpoint":outpoint,
+          "inscriptions":inscriptions,
+          "list":list,
+          "chain": page_config.chain,
+          "output":output,
+        }))
+        .into_response(),
+      )
+    } else {
+      Ok(
+        OutputHtml {
+          outpoint,
+          inscriptions,
+          list,
+          chain: page_config.chain,
+          output,
+        }
+        .page(page_config, index.has_sat_index()?)
+        .into_response(),
+      )
+    }
   }
 
   async fn range(
@@ -454,13 +469,36 @@ impl Server {
       DeserializeFromStr<Sat>,
       DeserializeFromStr<Sat>,
     )>,
-  ) -> ServerResult<PageHtml<RangeHtml>> {
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
     match start.cmp(&end) {
       Ordering::Equal => Err(ServerError::BadRequest("empty range".to_string())),
       Ordering::Greater => Err(ServerError::BadRequest(
         "range start greater than range end".to_string(),
       )),
-      Ordering::Less => Ok(RangeHtml { start, end }.page(page_config, index.has_sat_index()?)),
+      Ordering::Less => {
+        if accept_json.0 {
+          Ok(
+            axum::Json(serde_json::json!({
+              // "page_config":page_config,
+              "page_config": {
+                "chain":page_config.chain,
+                "domain":page_config.domain
+              },
+              "has_sat_index":index.has_sat_index()?,
+              "start":start,
+              "end":end
+            }))
+            .into_response(),
+          )
+        } else {
+          Ok(
+            RangeHtml { start, end }
+              .page(page_config, index.has_sat_index()?)
+              .into_response(),
+          )
+        }
+      }
     }
   }
 
@@ -490,7 +528,8 @@ impl Server {
     Extension(page_config): Extension<Arc<PageConfig>>,
     Extension(index): Extension<Arc<Index>>,
     Path(DeserializeFromStr(query)): Path<DeserializeFromStr<BlockQuery>>,
-  ) -> ServerResult<PageHtml<BlockHtml>> {
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
     let (block, height) = match query {
       BlockQuery::Height(height) => {
         let block = index
@@ -511,33 +550,57 @@ impl Server {
         (block, info.height as u64)
       }
     };
-
-    Ok(
+    Ok(if accept_json.0 {
+      axum::Json(serde_json::json!({
+        "height": height.to_string(),
+        "has_sat_index":index.has_sat_index()?,
+        "block":block
+      }))
+      .into_response()
+    } else {
       BlockHtml::new(block, Height(height), Self::index_height(&index)?)
-        .page(page_config, index.has_sat_index()?),
-    )
+        .page(page_config, index.has_sat_index()?)
+        .into_response()
+    })
   }
 
   async fn transaction(
     Extension(page_config): Extension<Arc<PageConfig>>,
     Extension(index): Extension<Arc<Index>>,
     Path(txid): Path<Txid>,
-  ) -> ServerResult<PageHtml<TransactionHtml>> {
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
     let inscription = index.get_inscription_by_id(txid.into())?;
 
     let blockhash = index.get_transaction_blockhash(txid)?;
+    println!("blockhash>>>>>>>>>>>:{:?}", blockhash);
 
-    Ok(
-      TransactionHtml::new(
-        index
-          .get_transaction(txid)?
-          .ok_or_not_found(|| format!("transaction {txid}"))?,
-        blockhash,
-        inscription.map(|_| txid.into()),
-        page_config.chain,
+    if accept_json.0 {
+      Ok(
+        axum::Json(serde_json::json!({
+          "transaction": index
+              .get_transaction(txid)?
+              .ok_or_not_found(|| format!("transaction {txid}"))?,
+          "blockhash":blockhash,
+          "chain":page_config.chain,
+          "has_sat_index":index.has_sat_index()?
+        }))
+        .into_response(),
       )
-      .page(page_config, index.has_sat_index()?),
-    )
+    } else {
+      Ok(
+        TransactionHtml::new(
+          index
+            .get_transaction(txid)?
+            .ok_or_not_found(|| format!("transaction {txid}"))?,
+          blockhash,
+          inscription.map(|_| txid.into()),
+          page_config.chain,
+        )
+        .page(page_config, index.has_sat_index()?)
+        .into_response(),
+      )
+    }
   }
 
   async fn status(Extension(index): Extension<Arc<Index>>) -> (StatusCode, &'static str) {
@@ -557,21 +620,54 @@ impl Server {
   async fn search_by_query(
     Extension(index): Extension<Arc<Index>>,
     Query(search): Query<Search>,
-  ) -> ServerResult<Redirect> {
-    Self::search(&index, &search.query).await
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
+    if accept_json.0 {
+      let url = Self::search_inner_str(&index, &search.query);
+      Ok(axum::Json(serde_json::json!({ "redirect_url": url })).into_response())
+    } else {
+      Ok(Self::search(&index, &search.query).await.into_response())
+    }
   }
 
   async fn search_by_path(
     Extension(index): Extension<Arc<Index>>,
     Path(search): Path<Search>,
-  ) -> ServerResult<Redirect> {
-    Self::search(&index, &search.query).await
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
+    if accept_json.0 {
+      let url = Self::search_inner_str(&index, &search.query);
+      Ok(axum::Json(serde_json::json!({ "redirect_url": url })).into_response())
+    } else {
+      Ok(Self::search(&index, &search.query).await.into_response())
+    }
   }
 
   async fn search(index: &Index, query: &str) -> ServerResult<Redirect> {
     Self::search_inner(index, query)
   }
+  fn search_inner_str(index: &Index, query: &str) -> String {
+    lazy_static! {
+      static ref HASH: Regex = Regex::new(r"^[[:xdigit:]]{64}$").unwrap();
+      static ref OUTPOINT: Regex = Regex::new(r"^[[:xdigit:]]{64}:\d+$").unwrap();
+      static ref INSCRIPTION_ID: Regex = Regex::new(r"^[[:xdigit:]]{64}i\d+$").unwrap();
+    }
 
+    let query = query.trim();
+    if HASH.is_match(query) {
+      if index.block_header(query.parse().unwrap())?.is_some() {
+        "/block/{query}".to_string()
+      } else {
+        "/tx/{query}".to_string()
+      }
+    } else if OUTPOINT.is_match(query) {
+      "/output/{query}".to_string()
+    } else if INSCRIPTION_ID.is_match(query) {
+      "/inscription/{query}".to_string()
+    } else {
+      "/sat/{query}".to_string()
+    }
+  }
   fn search_inner(index: &Index, query: &str) -> ServerResult<Redirect> {
     lazy_static! {
       static ref HASH: Regex = Regex::new(r"^[[:xdigit:]]{64}$").unwrap();
@@ -683,15 +779,24 @@ impl Server {
     )
   }
 
-  async fn block_count(Extension(index): Extension<Arc<Index>>) -> ServerResult<String> {
-    Ok(index.block_count()?.to_string())
+  async fn block_count(
+    Extension(index): Extension<Arc<Index>>,
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
+    Ok(if accept_json.0 {
+      axum::Json(serde_json::json!({ "block_count": index.block_count()?.to_string() }))
+        .into_response()
+    } else {
+      index.block_count()?.to_string().into_response()
+    })
   }
 
   async fn input(
     Extension(page_config): Extension<Arc<PageConfig>>,
     Extension(index): Extension<Arc<Index>>,
     Path(path): Path<(u64, usize, usize)>,
-  ) -> Result<PageHtml<InputHtml>, ServerError> {
+    accept_json: AcceptJson,
+  ) -> Result<Response, ServerError> {
     let not_found = || format!("input /{}/{}/{}", path.0, path.1, path.2);
 
     let block = index
@@ -709,8 +814,15 @@ impl Server {
       .into_iter()
       .nth(path.2)
       .ok_or_not_found(not_found)?;
-
-    Ok(InputHtml { path, input }.page(page_config, index.has_sat_index()?))
+    if accept_json.0 {
+      Ok(axum::Json(serde_json::json!({ "input": input })).into_response())
+    } else {
+      Ok(
+        InputHtml { path, input }
+          .page(page_config, index.has_sat_index()?)
+          .into_response(),
+      )
+    }
   }
 
   async fn faq() -> Redirect {
@@ -725,6 +837,7 @@ impl Server {
     Extension(index): Extension<Arc<Index>>,
     Extension(config): Extension<Arc<Config>>,
     Path(inscription_id): Path<InscriptionId>,
+    accept_json: AcceptJson,
   ) -> ServerResult<Response> {
     if config.is_hidden(inscription_id) {
       return Ok(PreviewUnknownHtml.into_response());
@@ -733,12 +846,21 @@ impl Server {
     let inscription = index
       .get_inscription_by_id(inscription_id)?
       .ok_or_not_found(|| format!("inscription {inscription_id}"))?;
-
-    Ok(
-      Self::content_response(inscription)
-        .ok_or_not_found(|| format!("inscription {inscription_id} content"))?
+    if accept_json.0 {
+      Ok(
+        axum::Json(serde_json::json!({
+          "content-type": inscription.content_type(),
+          "body": inscription.into_body(),
+        }))
         .into_response(),
-    )
+      )
+    } else {
+      Ok(
+        Self::content_response(inscription)
+          .ok_or_not_found(|| format!("inscription {inscription_id} content"))?
+          .into_response(),
+      )
+    }
   }
 
   fn content_response(inscription: Inscription) -> Option<(HeaderMap, Vec<u8>)> {
@@ -860,7 +982,24 @@ impl Server {
     let next = index.get_inscription_id_by_inscription_number(entry.number + 1)?;
 
     Ok(if accept_json.0 {
-      axum::Json(serde_json::json!({ "inscription_id": inscription_id })).into_response()
+      axum::Json(serde_json::json!({
+        "chain": page_config.chain,
+        "genesis_fee": entry.fee,
+        "genesis_height": entry.height,
+        "inscription":{
+          "content-type": inscription.content_type(),
+          "body": inscription.into_body(),
+        },
+        "next":next,
+        "number": entry.number,
+        "output":output,
+        "previous":previous,
+        "sat": entry.sat,
+        "satpoint":satpoint,
+        "timestamp": timestamp(entry.timestamp).timestamp(),
+        "has_sat_index":index.has_sat_index()?,
+      }))
+      .into_response()
     } else {
       InscriptionHtml {
         chain: page_config.chain,
@@ -884,16 +1023,52 @@ impl Server {
   async fn inscriptions(
     Extension(page_config): Extension<Arc<PageConfig>>,
     Extension(index): Extension<Arc<Index>>,
-  ) -> ServerResult<PageHtml<InscriptionsHtml>> {
-    Self::inscriptions_inner(page_config, index, None).await
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
+    if accept_json.0 {
+      let (inscriptions, prev, next) =
+        index.get_latest_inscriptions_with_prev_and_next(100, None)?;
+      Ok(
+        axum::Json(serde_json::json!({
+          "inscriptions": inscriptions,
+          "prev":prev,
+          "next":next
+        }))
+        .into_response(),
+      )
+    } else {
+      Ok(
+        Self::inscriptions_inner(page_config, index, None)
+          .await
+          .into_response(),
+      )
+    }
   }
 
   async fn inscriptions_from(
     Extension(page_config): Extension<Arc<PageConfig>>,
     Extension(index): Extension<Arc<Index>>,
     Path(from): Path<u64>,
-  ) -> ServerResult<PageHtml<InscriptionsHtml>> {
-    Self::inscriptions_inner(page_config, index, Some(from)).await
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
+    if accept_json.0 {
+      let (inscriptions, prev, next) =
+        index.get_latest_inscriptions_with_prev_and_next(100, Some(from))?;
+      Ok(
+        axum::Json(serde_json::json!({
+          "inscriptions": inscriptions,
+          "prev":prev,
+          "next":next
+        }))
+        .into_response(),
+      )
+    } else {
+      Ok(
+        Self::inscriptions_inner(page_config, index, Some(from))
+          .await
+          .into_response(),
+      )
+    }
   }
 
   async fn inscriptions_inner(
