@@ -1,6 +1,7 @@
+use futures::executor::block_on;
 use {
   self::inscription_updater::InscriptionUpdater,
-  super::{fetcher::Fetcher, *},
+  super::{fetcher::Fetcher, indexer::rpc_mesage, *},
   futures::future::try_join_all,
   std::sync::mpsc,
   tokio::sync::mpsc::{error::TryRecvError, Receiver, Sender},
@@ -8,7 +9,8 @@ use {
 
 mod inscription_updater;
 
-struct BlockData {
+#[derive(Debug, Clone)]
+pub struct BlockData {
   header: BlockHeader,
   txdata: Vec<(Transaction, Txid)>,
 }
@@ -107,7 +109,8 @@ impl Updater {
         Ok(block) => block,
         Err(mpsc::RecvError) => break,
       };
-
+      // update block
+      block_on(rpc_mesage(&block))?;
       self.index_block(
         index,
         &mut outpoint_sender,
@@ -338,8 +341,9 @@ impl Updater {
   ) -> Result<()> {
     // If value_receiver still has values something went wrong with the last block
     // Could be an assert, shouldn't recover from this and commit the last block
+    println!("block>>>>>>>>>>>>>{:?}", block);
     let Err(TryRecvError::Empty) = value_receiver.try_recv() else {
-      return Err(anyhow!("Previous block did not consume all input values")); 
+      return Err(anyhow!("Previous block did not consume all input values"));
     };
 
     let mut outpoint_to_value = wtx.open_table(OUTPOINT_TO_VALUE)?;

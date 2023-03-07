@@ -135,7 +135,6 @@ impl Server {
         }
         thread::sleep(Duration::from_millis(5000));
       });
-
       let config = options.load_config()?;
       let acme_domains = self.acme_domains()?;
 
@@ -623,7 +622,7 @@ impl Server {
     accept_json: AcceptJson,
   ) -> ServerResult<Response> {
     if accept_json.0 {
-      let url = Self::search_inner_str(&index, &search.query);
+      let url = Self::search_inner_str(&index, &search.query)?;
       Ok(axum::Json(serde_json::json!({ "redirect_url": url })).into_response())
     } else {
       Ok(Self::search(&index, &search.query).await.into_response())
@@ -636,7 +635,7 @@ impl Server {
     accept_json: AcceptJson,
   ) -> ServerResult<Response> {
     if accept_json.0 {
-      let url = Self::search_inner_str(&index, &search.query);
+      let url = Self::search_inner_str(&index, &search.query)?;
       Ok(axum::Json(serde_json::json!({ "redirect_url": url })).into_response())
     } else {
       Ok(Self::search(&index, &search.query).await.into_response())
@@ -646,7 +645,7 @@ impl Server {
   async fn search(index: &Index, query: &str) -> ServerResult<Redirect> {
     Self::search_inner(index, query)
   }
-  fn search_inner_str(index: &Index, query: &str) -> String {
+  fn search_inner_str(index: &Index, query: &str) -> ServerResult<String> {
     lazy_static! {
       static ref HASH: Regex = Regex::new(r"^[[:xdigit:]]{64}$").unwrap();
       static ref OUTPOINT: Regex = Regex::new(r"^[[:xdigit:]]{64}:\d+$").unwrap();
@@ -656,16 +655,16 @@ impl Server {
     let query = query.trim();
     if HASH.is_match(query) {
       if index.block_header(query.parse().unwrap())?.is_some() {
-        "/block/{query}".to_string()
+        Ok("/block/{query}".to_string())
       } else {
-        "/tx/{query}".to_string()
+        Ok("/tx/{query}".to_string())
       }
     } else if OUTPOINT.is_match(query) {
-      "/output/{query}".to_string()
+      Ok("/output/{query}".to_string())
     } else if INSCRIPTION_ID.is_match(query) {
-      "/inscription/{query}".to_string()
+      Ok("/inscription/{query}".to_string())
     } else {
-      "/sat/{query}".to_string()
+      Ok("/sat/{query}".to_string())
     }
   }
   fn search_inner(index: &Index, query: &str) -> ServerResult<Redirect> {

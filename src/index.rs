@@ -20,6 +20,7 @@ use {
 
 mod entry;
 mod fetcher;
+mod indexer;
 mod rtx;
 mod updater;
 

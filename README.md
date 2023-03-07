@@ -7,6 +7,8 @@
 ```terminal
 bitcoind -regtest
 cargo run -- --cookie-file .cookie -r server
+bitcoin-cli -regtest loadwallet test
+bitcoin-cli -regtest -rpcwallet=test -generate 1
 ```
 ### use api
 add header`accept:application/json`
