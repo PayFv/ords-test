@@ -1,7 +1,6 @@
-use futures::executor::block_on;
 use {
   self::inscription_updater::InscriptionUpdater,
-  super::{fetcher::Fetcher, indexer::rpc_mesage, *},
+  super::{fetcher::Fetcher, *},
   futures::future::try_join_all,
   std::sync::mpsc,
   tokio::sync::mpsc::{error::TryRecvError, Receiver, Sender},
@@ -110,7 +109,7 @@ impl Updater {
         Err(mpsc::RecvError) => break,
       };
       // update block
-      block_on(rpc_mesage(&block))?;
+      // block_on(rpc_mesage(&block))?;
       self.index_block(
         index,
         &mut outpoint_sender,
