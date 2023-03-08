@@ -1,3 +1,4 @@
+use futures::executor::block_on;
 use {
   self::inscription_updater::InscriptionUpdater,
   super::{fetcher::Fetcher, *},
@@ -8,7 +9,7 @@ use {
 
 mod inscription_updater;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockData {
   header: BlockHeader,
   txdata: Vec<(Transaction, Txid)>,
@@ -108,8 +109,14 @@ impl Updater {
         Ok(block) => block,
         Err(mpsc::RecvError) => break,
       };
-      // update block
-      // block_on(rpc_mesage(&block))?;
+      //  block rpc
+      let fetch = Fetcher::new(
+        "http://127.0.0.1:7001",
+        bitcoincore_rpc::Auth::UserPass(String::from("abc"), String::from("123")),
+      )
+      .unwrap();
+      fetch.notify_message(serde_json::json!(block).to_string());
+
       self.index_block(
         index,
         &mut outpoint_sender,
@@ -340,7 +347,6 @@ impl Updater {
   ) -> Result<()> {
     // If value_receiver still has values something went wrong with the last block
     // Could be an assert, shouldn't recover from this and commit the last block
-    println!("block>>>>>>>>>>>>>{:?}", block);
     let Err(TryRecvError::Empty) = value_receiver.try_recv() else {
       return Err(anyhow!("Previous block did not consume all input values"));
     };

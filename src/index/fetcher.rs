@@ -1,4 +1,7 @@
+use futures::executor::block_on;
 use http::StatusCode;
+use tokio;
+
 use {
   anyhow::{anyhow, Result},
   bitcoin::{Transaction, Txid},
@@ -7,7 +10,6 @@ use {
   serde::Deserialize,
   serde_json::{json, Value},
 };
-use tokio;
 
 pub(crate) struct Fetcher {
   client: Client<HttpConnector>,
@@ -112,31 +114,35 @@ impl Fetcher {
     Ok(txs)
   }
 
-  pub(crate) async fn notify_message(&self , body: String ) -> Result< String > {
-
+  pub(crate) fn notify_message(&self, body: String) -> Result<String> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+      .enable_all()
+      .build()
+      .unwrap();
+    // Call the asynchronous connect method using the runtime.
     let request = Request::builder()
-      .method( Method::POST )
+      .method(Method::POST)
       .uri(&self.url)
       .header(hyper::header::CONTENT_TYPE, "application/json")
-      .body( Body::from(body))?;
-
-    let response = self.client.request(request).await?;
-
+      .body(Body::from(body))?;
+    let handle = rt.spawn(self.client.request(request));
+    let response = rt.block_on(handle).unwrap().unwrap();
     match response.status() {
-      StatusCode::OK => return Ok(String::from("ok")) ,
-      _ => return Err(anyhow!("Request faild.") )
+      StatusCode::OK => return Ok(String::from("ok")),
+      _ => return Err(anyhow!("Request faild.")),
     }
-
   }
-
 }
 
-
-#[tokio::test]
-async fn notify_message_test() {
-
-  let fetch = Fetcher::new("http://127.0.0.1:7001" , 
-  bitcoincore_rpc::Auth::UserPass( String::from("abc"), String::from("123"))).unwrap();
-  let result = fetch.notify_message( String::from("{a:123}") ).await.unwrap();
-  assert_eq!( result , String::from("ok") )
+#[test]
+fn notify_message_test() {
+  let fetch = Fetcher::new(
+    "http://127.0.0.1:7001",
+    bitcoincore_rpc::Auth::UserPass(String::from("abc"), String::from("123")),
+  )
+  .unwrap();
+  let result = fetch
+    .notify_message(String::from(r#"{"key":"value"}"#))
+    .unwrap();
+  assert_eq!(result, String::from("ok"))
 }
