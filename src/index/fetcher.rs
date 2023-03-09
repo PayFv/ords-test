@@ -126,10 +126,13 @@ impl Fetcher {
       .header(hyper::header::CONTENT_TYPE, "application/json")
       .body(Body::from(body))?;
     let handle = rt.spawn(self.client.request(request));
-    let response = rt.block_on(handle).unwrap().unwrap();
-    match response.status() {
-      StatusCode::OK => return Ok(String::from("ok")),
-      _ => return Err(anyhow!("Request faild.")),
+    let response = rt.block_on(handle).unwrap();
+    match response {
+      Ok(resp) => match resp.status() {
+        StatusCode::OK => return Ok(String::from("ok")),
+        _ => return Err(anyhow!("Request faild.")),
+      },
+      _ => Ok("err".to_string()),
     }
   }
 }
