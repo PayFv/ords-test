@@ -13,6 +13,30 @@ bitcoin-cli -regtest -rpcwallet=test -generate 1
 ### use api
 add header`accept:application/json`
 
+## Build release for Ubuntu
+### local
+about 2min
+**Dependency**:
+```shell
+brew tap messense/macos-cross-toolchains
+brew install x86_64-unknown-linux-musl
+rustup target add x86_64-unknown-linux-musl
+```
+**build release**:
+```shell
+cargo build -r --target x86_64-unknown-linux-musl --config target.x86_64-unknown-linux-musl.linker=\"x86_64-unknown-linux-musl-gcc\"
+```
+
+### Ubuntu
+**Dependencey**:
+```shell
+sudo apt-get install musl-tools
+```
+**build release**
+about 30min
+```shell
+cargo build
+```
 ---
 
 `ord` is an index, block explorer, and command-line wallet. It is experimental

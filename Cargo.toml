@@ -67,7 +67,7 @@ unindent = "0.2.1"
 tokio-test = "0.4.2"
 
 [[bin]]
-name = "ord"
+name = "ord_exe"
 path = "src/bin/main.rs"
 
 [lib]
