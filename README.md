@@ -9,6 +9,8 @@ bitcoind -regtest
 cargo run -- --cookie-file .cookie -r server
 bitcoin-cli -regtest loadwallet test
 bitcoin-cli -regtest -rpcwallet=test -generate 1
+target/release/ord -r --index-sats --cookie-file .cookie server
+nohup ./ord_exe -r --index-sats --data-dir /mnt/disks/MOUNT_DIR/ord server --http-port 7003 &
 ```
 ### use api
 add header`accept:application/json`

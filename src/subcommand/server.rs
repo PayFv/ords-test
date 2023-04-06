@@ -989,6 +989,10 @@ impl Server {
           "content-type": inscription.content_type(),
           "body": inscription.into_body(),
         },
+        "created":{
+          "genesis_tx_id": inscription_id.txid,
+          "index":inscription_id.index
+        },
         "next":next,
         "number": entry.number,
         "output":output,
