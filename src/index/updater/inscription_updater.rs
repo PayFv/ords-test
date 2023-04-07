@@ -242,3 +242,5 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
     Ok(())
   }
 }
+
+fn inscription_logs(inscription_id: InscriptionIdValue, from: SatPointValue, to: SatPointValue) {}
