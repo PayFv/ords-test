@@ -2,6 +2,9 @@
 =====
 
 ## Test
+`cargo test test_inscription_trans -- --nocapture`
+`target/debug/ord_exe -r --index-sats --cookie-file .cookie server`
+if uncommitted == 5000 was changed to 10
 
 ### start service
 ```terminal
