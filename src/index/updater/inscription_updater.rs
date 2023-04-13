@@ -34,6 +34,8 @@ pub(super) struct InscriptionUpdater<'a, 'db, 'tx> {
       &'static InscriptionIdValue,
       &'static SatPointValue,
       &'static SatPointValue,
+      u64,
+      u32,
     ),
   >,
   history_len: &'a mut u64,
@@ -60,6 +62,8 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
         &'static InscriptionIdValue,
         &'static SatPointValue,
         &'static SatPointValue,
+        u64,
+        u32,
       ),
     >,
     history_len: &'a mut u64,
@@ -271,7 +275,13 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
 
     self.inscription_trans.insert(
       self.history_len.clone(),
-      (&inscription_id, &_old_satpoint.store(), &new_satpoint),
+      (
+        &inscription_id,
+        &_old_satpoint.store(),
+        &new_satpoint,
+        self.height,
+        self.timestamp,
+      ),
     )?;
     *(self.history_len) += 1;
     // println!("self.history_len--------->{}", self.history_len);
