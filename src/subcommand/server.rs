@@ -169,6 +169,7 @@ impl Server {
         .route("/install.sh", get(Self::install_script))
         .route("/ordinal/:sat", get(Self::ordinal))
         .route("/output/:output", get(Self::output))
+        .route("/number/:number", get(Self::number))
         .route("/preview/:inscription_id", get(Self::preview))
         .route("/range/:start/:end", get(Self::range))
         .route("/rare.txt", get(Self::rare_txt))
@@ -467,6 +468,16 @@ impl Server {
         .into_response(),
       )
     }
+  }
+
+  async fn number(
+    Extension(page_config): Extension<Arc<PageConfig>>,
+    Extension(index): Extension<Arc<Index>>,
+    Path(DeserializeFromStr(number)): Path<DeserializeFromStr<u64>>,
+  ) -> ServerResult<Response> {
+    let inscription_id = index.get_inscription_id_by_inscription_number(number)?;
+
+    Ok(axum::Json(serde_json::json!({ "inscription_id": inscription_id })).into_response())
   }
 
   async fn range(
