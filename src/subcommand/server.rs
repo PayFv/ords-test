@@ -161,6 +161,10 @@ impl Server {
         .route("/input/:block/:transaction/:input", get(Self::input))
         .route("/inscription/:inscription_id", get(Self::inscription))
         .route(
+          "/inscription2num/:inscription_id",
+          get(Self::inscription2num),
+        )
+        .route(
           "/inscriptionmini/:inscription_id",
           get(Self::inscriptionmini),
         )
@@ -1051,6 +1055,19 @@ impl Server {
       }))
       .into_response(),
     )
+  }
+
+  async fn inscription2num(
+    Extension(page_config): Extension<Arc<PageConfig>>,
+    Extension(index): Extension<Arc<Index>>,
+    Path(inscription_id): Path<InscriptionId>,
+    accept_json: AcceptJson,
+  ) -> ServerResult<Response> {
+    let entry = index
+      .get_inscription_entry(inscription_id)?
+      .ok_or_not_found(|| format!("inscription {inscription_id}"))?;
+
+    Ok(axum::Json(serde_json::json!({ "number": entry.number })).into_response())
   }
 
   async fn inscription(
