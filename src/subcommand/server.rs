@@ -2591,7 +2591,7 @@ mod tests {
   }
 
   #[test]
-  fn resonses_are_gzipped() {
+  fn responses_are_gzipped() {
     let server = TestServer::new();
 
     let mut headers = HeaderMap::new();
@@ -2613,7 +2613,7 @@ mod tests {
   }
 
   #[test]
-  fn resonses_are_brotlied() {
+  fn responses_are_brotlied() {
     let server = TestServer::new();
 
     let mut headers = HeaderMap::new();

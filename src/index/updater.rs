@@ -168,7 +168,7 @@ impl Updater {
           )?;
       }
 
-      if INTERRUPTS.load(atomic::Ordering::Relaxed) > 0 {
+      if SHUTTING_DOWN.load(atomic::Ordering::Relaxed) {
         break;
       }
     }
