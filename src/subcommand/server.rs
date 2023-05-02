@@ -1038,7 +1038,10 @@ impl Server {
         "genesis_height": entry.height,
         "inscription":{
           "content-type": inscription.content_type(),
-          "content-length": inscription.body().unwrap().len(),
+          "content-length":  match inscription.body() {
+            Some(o) => o.len(),
+            None => 0
+          }
         },
         "created":{
           "genesis_tx_id": inscription_id.txid,

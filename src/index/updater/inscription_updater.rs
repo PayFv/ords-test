@@ -197,7 +197,10 @@ impl<'a, 'db, 'tx> InscriptionUpdater<'a, 'db, 'tx> {
     if is_coinbase {
       for flotsam in inscriptions {
         let new_satpoint = SatPoint {
-          outpoint: OutPoint::null(),
+          outpoint: OutPoint {
+            vout: 0,
+            txid: tx.txid(),
+          },
           offset: self.lost_sats + flotsam.offset - output_value,
         };
         self.update_inscription_location(input_sat_ranges, flotsam, new_satpoint)?;
